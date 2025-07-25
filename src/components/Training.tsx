@@ -105,6 +105,19 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
     };
   };
 
+  const getTrainingSubtypeText = (training: any) => {
+    if (!training.subtype) return null;
+    if (training.subtype === 'all-hands') return 'Все руки';
+    if (training.subtype === 'border-check') {
+      // Handle old data that might not have this property
+      if (training.borderExpansionLevel === undefined) {
+        return 'Граница ренжа (+0)';
+      }
+      return `Граница ренжа (+${training.borderExpansionLevel})`;
+    }
+    return null;
+  };
+
   const handleCreateTraining = (training: any) => {
     setTrainings(prev => [...prev, training]);
   };
@@ -221,6 +234,8 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
               trainings.map((training) => {
                 const stats = getTrainingStats(training.id);
                 const isSelected = selectedTraining === training.id;
+                const subtypeText = getTrainingSubtypeText(training);
+
                 return (
                   <Card 
                     key={training.id} 
@@ -241,7 +256,7 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
                         )}>
                           <div className="text-xs text-muted-foreground">
                             {training.type === 'classic' ? 'Классическая' : 'Повторение границ'}
-                            {training.subtype && ` • ${training.subtype === 'all-hands' ? 'Все руки' : 'Проверка границ'}`}
+                            {subtypeText && ` • ${subtypeText}`}
                           </div>
                           {stats && (
                             <div className="text-xs text-muted-foreground mt-1">
@@ -319,6 +334,7 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
                     if (!training) return null;
                     
                     const stats = getTrainingStats(training.id);
+                    const subtypeText = getTrainingSubtypeText(training);
                     
                     return (
                       <div className="space-y-6">
@@ -332,7 +348,7 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
                             isMobileMode && "text-sm"
                           )}>
                             {training.type === 'classic' ? 'Классическая тренировка' : 'Тренировка повторения границ'}
-                            {training.subtype && ` • ${training.subtype === 'all-hands' ? 'Все руки' : 'Проверка границ'}`}
+                            {subtypeText && ` • ${subtypeText}`}
                           </p>
                         </div>
 

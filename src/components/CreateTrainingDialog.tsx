@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useRangeContext } from "@/contexts/RangeContext";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface CreateTrainingDialogProps {
   open: boolean;
@@ -19,6 +19,7 @@ export const CreateTrainingDialog = ({ open, onOpenChange, onCreateTraining }: C
   const [name, setName] = useState("");
   const [trainingType, setTrainingType] = useState<"classic" | "border-repeat">("classic");
   const [classicSubtype, setClassicSubtype] = useState<"all-hands" | "border-check">("all-hands");
+  const [borderExpansionLevel, setBorderExpansionLevel] = useState<0 | 1 | 2>(0);
   const [selectedRanges, setSelectedRanges] = useState<string[]>([]);
   
   const { folders } = useRangeContext();
@@ -41,6 +42,9 @@ export const CreateTrainingDialog = ({ open, onOpenChange, onCreateTraining }: C
       name: name.trim(),
       type: trainingType,
       subtype: trainingType === 'classic' ? classicSubtype : undefined,
+      borderExpansionLevel: trainingType === 'classic' && classicSubtype === 'border-check' 
+        ? borderExpansionLevel 
+        : undefined,
       ranges: selectedRanges,
       createdAt: new Date(),
       stats: null
@@ -52,6 +56,7 @@ export const CreateTrainingDialog = ({ open, onOpenChange, onCreateTraining }: C
     setName("");
     setTrainingType("classic");
     setClassicSubtype("all-hands");
+    setBorderExpansionLevel(0);
     setSelectedRanges([]);
     onOpenChange(false);
   };
@@ -89,15 +94,42 @@ export const CreateTrainingDialog = ({ open, onOpenChange, onCreateTraining }: C
                 </div>
                 
                 {trainingType === "classic" && (
-                  <div className="ml-6 space-y-2">
+                  <div className="ml-6 space-y-3">
                     <RadioGroup value={classicSubtype} onValueChange={(value: any) => setClassicSubtype(value)}>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="all-hands" id="all-hands" />
                         <Label htmlFor="all-hands">Все руки</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="border-check" id="border-check" />
-                        <Label htmlFor="border-check">Проверка границ</Label>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="border-check" id="border-check" />
+                          <Label htmlFor="border-check">Граница ренжа</Label>
+                        </div>
+
+                        {classicSubtype === 'border-check' && (
+                          <div className="pl-8 pt-2">
+                            <Label className="text-xs font-normal text-muted-foreground">Уровень расширения</Label>
+                            <RadioGroup 
+                              value={String(borderExpansionLevel)} 
+                              onValueChange={(value) => setBorderExpansionLevel(Number(value) as 0 | 1 | 2)}
+                              className="flex items-center gap-x-4 pt-2"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="0" id="level-0" />
+                                <Label htmlFor="level-0" className="font-normal cursor-pointer">0</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="1" id="level-1" />
+                                <Label htmlFor="level-1" className="font-normal cursor-pointer">+1</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="2" id="level-2" />
+                                <Label htmlFor="level-2" className="font-normal cursor-pointer">+2</Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+                        )}
                       </div>
                     </RadioGroup>
                   </div>
@@ -121,29 +153,33 @@ export const CreateTrainingDialog = ({ open, onOpenChange, onCreateTraining }: C
                 </p>
               </Card>
             ) : (
-              <div className="space-y-3 max-h-60 overflow-y-auto">
-                {folders.map((folder) => (
-                  folder.ranges.length > 0 && (
-                    <Card key={folder.id} className="p-3">
-                      <h4 className="font-medium mb-2">{folder.name}</h4>
-                      <div className="space-y-2 ml-4">
-                        {folder.ranges.map((range) => (
-                          <div key={range.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={range.id}
-                              checked={selectedRanges.includes(range.id)}
-                              onCheckedChange={() => handleRangeToggle(range.id)}
-                            />
-                            <Label htmlFor={range.id} className="text-sm">
-                              {range.name}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
-                  )
-                ))}
-              </div>
+              <Accordion type="multiple" className="w-full max-h-60 overflow-y-auto pr-2">
+                {folders.map((folder) =>
+                  folder.ranges.length > 0 ? (
+                    <AccordionItem value={folder.id} key={folder.id}>
+                      <AccordionTrigger className="py-2 hover:no-underline">
+                        {folder.name}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-2 pt-2 pl-4">
+                          {folder.ranges.map((range) => (
+                            <div key={range.id} className="flex items-center space-x-3">
+                              <Checkbox
+                                id={range.id}
+                                checked={selectedRanges.includes(range.id)}
+                                onCheckedChange={() => handleRangeToggle(range.id)}
+                              />
+                              <Label htmlFor={range.id} className="text-sm font-normal cursor-pointer">
+                                {range.name}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ) : null
+                )}
+              </Accordion>
             )}
           </div>
 
