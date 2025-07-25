@@ -629,7 +629,7 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
   return (
     <div className={cn(
       "bg-background",
-      isMobileMode ? "h-screen flex flex-col" : "flex h-screen"
+      isMobileMode ? "h-full flex flex-col" : "flex h-screen"
     )}>
       <CreateActionButtonDialog 
         open={isCreateActionDialogOpen}

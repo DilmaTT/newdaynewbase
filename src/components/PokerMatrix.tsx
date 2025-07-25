@@ -54,6 +54,8 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'select' | 'deselect' | null>(null);
   const lastHandEnteredRef = useRef<string | null>(null);
+  const wasDragged = useRef(false);
+  const lastHandSelectedDuringDrag = useRef<string | null>(null);
   // Initialize zoomLevel to 0.85 (15% reduction) for desktop, 1 for mobile
   const [zoomLevel, setZoomLevel] = useState<number>(isMobile ? 1 : 0.85);
 
@@ -83,38 +85,50 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
     };
   }, []);
 
-  const handleMouseDown = (hand: string) => {
-    if (readOnly || isBackgroundMode) return; // Prevent interaction in background mode
+  const handlePointerDown = (hand: string) => {
+    if (readOnly || isBackgroundMode) return;
+    wasDragged.current = false;
+    lastHandSelectedDuringDrag.current = null;
     setIsDragging(true);
     lastHandEnteredRef.current = hand;
 
     const currentHandAction = selectedHands[hand];
     const mode = currentHandAction === activeAction ? 'deselect' : 'select';
-    
     setDragMode(mode);
-    onHandSelect(hand, mode);
   };
 
-  const handleMouseEnter = (hand: string) => {
-    if (readOnly || isBackgroundMode || !isDragging || !dragMode) return; // Prevent interaction in background mode
+  const handlePointerEnter = (hand: string) => {
+    if (readOnly || isBackgroundMode || !isDragging || !dragMode) return;
     
-    if (lastHandEnteredRef.current !== hand) {
+    wasDragged.current = true;
+    
+    if (lastHandSelectedDuringDrag.current !== hand) {
       onHandSelect(hand, dragMode);
-      lastHandEnteredRef.current = hand;
+      lastHandSelectedDuringDrag.current = hand;
     }
   };
 
   const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDragging || isBackgroundMode) return; // Prevent interaction in background mode
-    event.preventDefault();
-
+    if (!isDragging || isBackgroundMode) return;
+    event.preventDefault(); // Prevent scrolling while dragging
+    
     const touch = event.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
 
     if (element instanceof HTMLElement && element.dataset.hand) {
       const hand = element.dataset.hand;
-      handleMouseEnter(hand);
+      wasDragged.current = true; // Mark as dragged on any move
+      handlePointerEnter(hand);
     }
+  };
+
+  const handleClick = (hand: string) => {
+    if (readOnly || isBackgroundMode) return;
+    if (wasDragged.current) return; // Don't fire click after a drag
+
+    const currentHandAction = selectedHands[hand];
+    const mode = currentHandAction === activeAction ? 'deselect' : 'select';
+    onHandSelect(hand, mode);
   };
 
   const getHandStyle = (hand: string) => {
@@ -190,12 +204,10 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
               getHandColorClass(hand)
             )}
             style={getHandStyle(hand)}
-            onMouseDown={() => handleMouseDown(hand)}
-            onMouseEnter={() => handleMouseEnter(hand)}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              handleMouseDown(hand);
-            }}
+            onClick={() => handleClick(hand)}
+            onMouseDown={() => handlePointerDown(hand)}
+            onMouseEnter={() => handlePointerEnter(hand)}
+            onTouchStart={() => handlePointerDown(hand)}
             disabled={readOnly || isBackgroundMode} // Disable interaction in background mode
           >
             {hand}

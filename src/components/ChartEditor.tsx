@@ -449,7 +449,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
   const Controls = (
     <div className={cn(
       "flex items-center gap-4",
-      isMobileMode ? "flex-wrap gap-y-2 p-4 border-t bg-muted" : "mb-6"
+      isMobileMode ? "flex-wrap gap-y-2 p-4 mb-4" : "mb-6"
     )}>
       <Button onClick={handleAddButton} className="flex items-center gap-2 h-7">
         <Plus className="h-4 w-4" />
@@ -554,8 +554,8 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
 
         {isMobileMode ? (
           <>
-            {Canvas}
             {Controls}
+            {Canvas}
           </>
         ) : (
           <>

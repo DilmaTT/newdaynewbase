@@ -119,6 +119,10 @@ All colors MUST be HSL.
 }
 
 @layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+
   html {
     background-color: black;
   }
