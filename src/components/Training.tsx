@@ -318,7 +318,7 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
         </div>
 
         {/* Main Content */}
-        {(!isMobileMode || selectedTraining) && (
+        {!isMobileMode && (
           <div className={cn(
             "p-6",
             isMobileMode ? "order-1 flex-1" : "flex-1 overflow-y-auto"
