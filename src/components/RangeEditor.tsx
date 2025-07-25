@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { PokerMatrix, getCombinations, TOTAL_POKER_COMBINATIONS } from "./PokerMatrix"; // Import helpers
-import { Plus, Palette, Trash2, Copy, SlidersHorizontal } from "lucide-react"; // Added Copy and SlidersHorizontal
+import { Plus, Palette, Trash2, Copy, SlidersHorizontal, Settings } from "lucide-react"; // Added Settings
 import { cn } from "@/lib/utils";
-import { useRangeContext, ActionButton } from "@/contexts/RangeContext";
-import { CreateActionButtonDialog } from "./CreateActionButtonDialog"; // Import the new dialog
+import { useRangeContext, ActionButton, SimpleActionButton } from "@/contexts/RangeContext";
+import { ActionButtonSettingsDialog } from "./ActionButtonSettingsDialog"; // Import the new dialog
 import {
   Dialog,
   DialogContent,
@@ -250,7 +250,11 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
   const [activeAction, setActiveAction] = useState(actionButtons[0]?.id || 'raise');
   const [showRangeSelectorDialog, setShowRangeSelectorDialog] = useState(false);
   const [openFolderId, setOpenFolderId] = useState<string | null>(null); // State for Accordion
-  const [isCreateActionDialogOpen, setCreateActionDialogOpen] = useState(false);
+  
+  // State for the new settings dialog
+  const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [buttonToEdit, setButtonToEdit] = useState<SimpleActionButton | null>(null);
+
 
   // Effect to set the open folder based on selectedRange
   useEffect(() => {
@@ -398,15 +402,21 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
     });
   };
 
-  const handleSaveNewAction = (newButton: ActionButton) => {
-    setActionButtons(prev => [...prev, newButton]);
-    setActiveAction(newButton.id);
-  };
-
-  const updateActionButton = (id: string, field: 'name' | 'color', value: string) => {
-    setActionButtons(prev => prev.map(button => 
-      (button.id === id && button.type === 'simple') ? { ...button, [field]: value } : button
-    ));
+  const handleSaveAction = (buttonToSave: SimpleActionButton) => {
+    setActionButtons(prev => {
+      const buttonExists = prev.some(b => b.id === buttonToSave.id);
+      if (buttonExists) {
+        // Update existing button
+        return prev.map(b => b.id === buttonToSave.id ? buttonToSave : b);
+      } else {
+        // Add new button
+        return [...prev, buttonToSave];
+      }
+    });
+    // If it's a new button, set it as active
+    if (!actionButtons.some(b => b.id === buttonToSave.id)) {
+      setActiveAction(buttonToSave.id);
+    }
   };
 
   const deleteActionButton = (id: string) => {
@@ -613,17 +623,22 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
   };
 
   const getActionButtonStyle = (button: ActionButton) => {
+    const style: React.CSSProperties = {};
+
     if (button.type === 'simple') {
-      return { backgroundColor: button.color };
-    }
-    if (button.type === 'weighted') {
+      style.backgroundColor = button.color;
+      style.color = button.fontColor ?? 'white';
+      if (button.isFontAdaptive === false && button.fontSize) {
+        style.fontSize = `${button.fontSize}px`;
+      }
+    } else if (button.type === 'weighted') {
       const color1 = getActionColor(button.action1Id, actionButtons);
       const color2 = getActionColor(button.action2Id, actionButtons);
-      return {
-        background: `linear-gradient(to right, ${color1} ${button.weight}%, ${color2} ${button.weight}%)`,
-      };
+      style.background = `linear-gradient(to right, ${color1} ${button.weight}%, ${color2} ${button.weight}%)`;
+      // Font settings for weighted buttons can be added here if needed in the future
     }
-    return {};
+    
+    return style;
   };
 
   return (
@@ -631,10 +646,11 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
       "bg-background",
       isMobileMode ? "h-full flex flex-col" : "flex h-screen"
     )}>
-      <CreateActionButtonDialog 
-        open={isCreateActionDialogOpen}
-        onOpenChange={setCreateActionDialogOpen}
-        onSave={handleSaveNewAction}
+      <ActionButtonSettingsDialog
+        open={isSettingsDialogOpen}
+        onOpenChange={setSettingsDialogOpen}
+        onSave={handleSaveAction}
+        buttonToEdit={buttonToEdit}
       />
 
       {isMobileMode ? (
@@ -682,7 +698,7 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium">Действия</h3>
-                    <Button size="sm" variant="outline" onClick={() => setCreateActionDialogOpen(true)}>
+                    <Button size="sm" variant="outline" onClick={() => { setButtonToEdit(null); setSettingsDialogOpen(true); }}>
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
@@ -695,43 +711,23 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
                           onClick={() => setActiveAction(button.id)}
                           style={getActionButtonStyle(button)}
                           className={cn(
-                            "flex-1 min-w-0 text-primary-foreground border-transparent",
+                            "flex-1 min-w-0 border-transparent",
                             "hover:opacity-90 transition-opacity",
-                            activeAction === button.id && "ring-2 ring-offset-2 ring-offset-card ring-primary"
+                            activeAction === button.id && "ring-2 ring-offset-2 ring-offset-card ring-primary",
+                            button.type === 'simple' && !button.isFontAdaptive && "text-base" // override adaptive text
                           )}
                         >
-                          {editingButton === button.id ? (
-                            <Input
-                              value={button.name}
-                              onChange={(e) => updateActionButton(button.id, 'name', e.target.value)}
-                              onBlur={() => setEditingButton(null)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') setEditingButton(null);
-                              }}
-                              className="h-5 text-xs border-none bg-transparent p-0 focus:bg-background text-center w-full"
-                              autoFocus
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <span 
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                setEditingButton(button.id);
-                              }}
-                              className="cursor-text truncate px-1"
-                            >
-                              {button.name}
-                            </span>
-                          )}
+                          <span className="truncate px-1">{button.name}</span>
                         </Button>
                         <div className="flex gap-1">
                           {button.type === 'simple' ? (
-                            <input
-                              type="color"
-                              value={button.color}
-                              onChange={(e) => updateActionButton(button.id, 'color', e.target.value)}
-                              className="w-6 h-6 rounded border cursor-pointer"
-                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => { setButtonToEdit(button); setSettingsDialogOpen(true); }}
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
                           ) : (
                             <div className="w-6 h-6 flex items-center justify-center">
                               <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
@@ -791,7 +787,7 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
             <div className="space-y-3 border-t order-2 pt-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">Действия</h3>
-                <Button size="sm" variant="outline" onClick={() => setCreateActionDialogOpen(true)}>
+                <Button size="sm" variant="outline" onClick={() => { setButtonToEdit(null); setSettingsDialogOpen(true); }}>
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
@@ -804,43 +800,23 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
                       onClick={() => setActiveAction(button.id)}
                       style={getActionButtonStyle(button)}
                       className={cn(
-                        "flex-1 min-w-0 text-primary-foreground border-transparent",
+                        "flex-1 min-w-0 border-transparent",
                         "hover:opacity-90 transition-opacity",
-                        activeAction === button.id && "ring-2 ring-offset-2 ring-offset-card ring-primary"
+                        activeAction === button.id && "ring-2 ring-offset-2 ring-offset-card ring-primary",
+                        button.type === 'simple' && !button.isFontAdaptive && "text-base" // override adaptive text
                       )}
                     >
-                      {editingButton === button.id ? (
-                        <Input
-                          value={button.name}
-                          onChange={(e) => updateActionButton(button.id, 'name', e.target.value)}
-                          onBlur={() => setEditingButton(null)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') setEditingButton(null);
-                          }}
-                          className="h-5 text-xs border-none bg-transparent p-0 focus:bg-background text-center w-full"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <span 
-                          onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setEditingButton(button.id);
-                          }}
-                          className="cursor-text truncate px-1"
-                        >
-                          {button.name}
-                        </span>
-                      )}
+                       <span className="truncate px-1">{button.name}</span>
                     </Button>
                     <div className="flex gap-1">
                       {button.type === 'simple' ? (
-                        <input
-                          type="color"
-                          value={button.color}
-                          onChange={(e) => updateActionButton(button.id, 'color', e.target.value)}
-                          className="w-6 h-6 rounded border cursor-pointer"
-                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setButtonToEdit(button); setSettingsDialogOpen(true); }}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
                       ) : (
                         <div className="w-6 h-6 flex items-center justify-center">
                           <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />

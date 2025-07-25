@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Play, Trash2 } from "lucide-react";
+import { Play, Trash2, BarChart2 } from "lucide-react";
 import { CreateTrainingDialog } from "./CreateTrainingDialog";
 import { cn } from "@/lib/utils";
 import {
@@ -13,8 +13,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { TrainingSession } from "./TrainingSession";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-// --- Original Training Component ---
 
 interface TrainingProps {
   isMobileMode?: boolean;
@@ -44,13 +44,16 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
   const [activeTraining, setActiveTraining] = useState<any>(null);
   const [detailedStats, setDetailedStats] = useState<SessionStat[]>([]);
   const [statsVersion, setStatsVersion] = useState(0);
+  const [statsModalTrainingId, setStatsModalTrainingId] = useState<string | null>(null);
+  const [modalStats, setModalStats] = useState<SessionStat[]>([]);
+  const statsModalTraining = trainings.find(t => t.id === statsModalTrainingId);
 
   // Save trainings to localStorage when they change
   useEffect(() => {
     localStorage.setItem('training-sessions', JSON.stringify(trainings));
   }, [trainings]);
 
-  // Fetch detailed stats when a training is selected or when stats are updated
+  // Fetch detailed stats for main view
   useEffect(() => {
     if (selectedTraining) {
       const allStats = JSON.parse(localStorage.getItem('training-statistics') || '[]') as SessionStat[];
@@ -62,6 +65,19 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
       setDetailedStats([]);
     }
   }, [selectedTraining, statsVersion]);
+
+  // Fetch stats for modal view
+  useEffect(() => {
+    if (statsModalTrainingId) {
+      const allStats = JSON.parse(localStorage.getItem('training-statistics') || '[]') as SessionStat[];
+      const trainingStats = allStats
+        .filter((stat) => stat.trainingId === statsModalTrainingId)
+        .sort((a, b) => b.timestamp - a.timestamp);
+      setModalStats(trainingStats);
+    } else {
+      setModalStats([]);
+    }
+  }, [statsModalTrainingId]);
 
 
   // Calculate and update training statistics
@@ -118,6 +134,22 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
     setStatsVersion(v => v + 1);
   };
 
+  const formatLongDuration = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const parts = [];
+    if (hours > 0) parts.push(`${hours}ч`);
+    if (minutes > 0) parts.push(`${minutes}м`);
+    if (seconds > 0 || totalSeconds === 0) {
+        parts.push(`${seconds}с`);
+    }
+    
+    return parts.join(' ') || '0с';
+  };
+
   const formatSessionDuration = (duration: number) => {
     const minutes = Math.floor(duration / 60000);
     const seconds = Math.floor((duration % 60000) / 1000);
@@ -136,6 +168,19 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
     if (total === 0) return '0.0';
     return ((correct / total) * 100).toFixed(1);
   };
+
+  const summaryStats = useMemo(() => {
+    if (modalStats.length === 0) {
+      return { totalDuration: 0, totalAccuracy: 0 };
+    }
+
+    const totalDuration = modalStats.reduce((acc, stat) => acc + stat.duration, 0);
+    const totalCorrect = modalStats.reduce((acc, stat) => acc + stat.correctAnswers, 0);
+    const totalQuestions = modalStats.reduce((acc, stat) => acc + stat.totalQuestions, 0);
+    const totalAccuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
+
+    return { totalDuration, totalAccuracy };
+  }, [modalStats]);
 
   if (activeTraining) {
     return (
@@ -175,37 +220,72 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
             ) : (
               trainings.map((training) => {
                 const stats = getTrainingStats(training.id);
+                const isSelected = selectedTraining === training.id;
                 return (
                   <Card 
                     key={training.id} 
-                    className={`p-3 cursor-pointer transition-colors ${
-                      selectedTraining === training.id ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
-                    }`}
-                    onClick={() => setSelectedTraining(training.id)}
+                    className={cn(
+                      'p-3 cursor-pointer transition-all duration-300',
+                      isSelected ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
+                    )}
+                    onClick={() => setSelectedTraining(prev => prev === training.id ? null : training.id)}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 overflow-hidden">
                         <h4 className="font-medium">{training.name}</h4>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {training.type === 'classic' ? 'Классическая' : 'Повторение границ'}
-                          {training.subtype && ` • ${training.subtype === 'all-hands' ? 'Все руки' : 'Проверка границ'}`}
-                        </div>
-                        {stats && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Точность: {stats.accuracy}% • Сессий: {stats.sessions}
+                        <div className={cn(
+                          "transition-all duration-300 ease-in-out",
+                          isMobileMode
+                            ? (isSelected ? "max-h-40 opacity-100 mt-1" : "max-h-0 opacity-0")
+                            : "max-h-40 opacity-100 mt-1" // Always visible on desktop
+                        )}>
+                          <div className="text-xs text-muted-foreground">
+                            {training.type === 'classic' ? 'Классическая' : 'Повторение границ'}
+                            {training.subtype && ` • ${training.subtype === 'all-hands' ? 'Все руки' : 'Проверка границ'}`}
                           </div>
-                        )}
+                          {stats && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Точность: {stats.accuracy}% • Сессий: {stats.sessions}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTraining(training.id);
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      <div className="flex items-center">
+                        {isMobileMode && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStatsModalTrainingId(training.id);
+                              }}
+                            >
+                              <BarChart2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartTraining(training.id);
+                              }}
+                            >
+                              <Play className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTraining(training.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 );
@@ -223,134 +303,138 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
         </div>
 
         {/* Main Content */}
-        <div className={cn(
-          "p-6",
-          isMobileMode ? "order-1 flex-1" : "flex-1 overflow-y-auto"
-        )}>
+        {(!isMobileMode || selectedTraining) && (
           <div className={cn(
-            "mx-auto space-y-6",
-            isMobileMode ? "max-w-full" : "max-w-4xl"
+            "p-6",
+            isMobileMode ? "order-1 flex-1" : "flex-1 overflow-y-auto"
           )}>
-            {selectedTraining ? (
-              <div>
-                {(() => {
-                  const training = trainings.find(t => t.id === selectedTraining);
-                  if (!training) return null;
-                  
-                  const stats = getTrainingStats(training.id);
-                  
-                  return (
-                    <div className="space-y-6">
-                      <div className="text-center">
-                        <h1 className={cn(
-                          "font-bold mb-2",
-                          isMobileMode ? "text-xl" : "text-2xl"
-                        )}>{training.name}</h1>
-                        <p className={cn(
-                          "text-muted-foreground",
-                          isMobileMode && "text-sm"
-                        )}>
-                          {training.type === 'classic' ? 'Классическая тренировка' : 'Тренировка повторения границ'}
-                          {training.subtype && ` • ${training.subtype === 'all-hands' ? 'Все руки' : 'Проверка границ'}`}
-                        </p>
-                      </div>
-
-                      {/* Training Stats */}
-                      {stats ? (
-                        <Card className="p-6">
-                          <h3 className="text-lg font-semibold mb-4">Статистика всех сессий</h3>
-                          <div className={cn(
-                            "gap-4 text-center",
-                            isMobileMode ? "grid grid-cols-2 space-y-2" : "grid grid-cols-4"
+            <div className={cn(
+              "mx-auto space-y-6",
+              isMobileMode ? "max-w-full" : "max-w-4xl"
+            )}>
+              {selectedTraining ? (
+                <div>
+                  {(() => {
+                    const training = trainings.find(t => t.id === selectedTraining);
+                    if (!training) return null;
+                    
+                    const stats = getTrainingStats(training.id);
+                    
+                    return (
+                      <div className="space-y-6">
+                        <div className="text-center">
+                          <h1 className={cn(
+                            "font-bold mb-2",
+                            isMobileMode ? "text-xl" : "text-2xl"
+                          )}>{training.name}</h1>
+                          <p className={cn(
+                            "text-muted-foreground",
+                            isMobileMode && "text-sm"
                           )}>
-                            <div>
-                              <div className="text-2xl font-bold text-primary">{stats.accuracy}%</div>
-                              <div className="text-sm text-muted-foreground">Точность</div>
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold text-primary">{stats.hands}</div>
-                              <div className="text-sm text-muted-foreground">Рук сыграно</div>
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold text-primary">{stats.time}</div>
-                              <div className="text-sm text-muted-foreground">Среднее время</div>
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold text-primary">{stats.sessions}</div>
-                              <div className="text-sm text-muted-foreground">Сессий</div>
-                            </div>
-                          </div>
-                        </Card>
-                      ) : (
-                        <Card className="p-6 text-center text-muted-foreground">
-                          Начните тренировку, чтобы собрать статистику.
-                        </Card>
-                      )}
+                            {training.type === 'classic' ? 'Классическая тренировка' : 'Тренировка повторения границ'}
+                            {training.subtype && ` • ${training.subtype === 'all-hands' ? 'Все руки' : 'Проверка границ'}`}
+                          </p>
+                        </div>
 
-                      {/* Start Training Button */}
-                      <div className="text-center">
-                        <Button 
-                          size="lg" 
-                          variant="poker"
-                          onClick={() => handleStartTraining(training.id)}
-                        >
-                          <Play className="h-5 w-5 mr-2" />
-                          Запустить тренировку
-                        </Button>
-                      </div>
-
-                      {/* Detailed Session History (PC only) */}
-                      {!isMobileMode && (
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>История сессий</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {detailedStats.length > 0 ? (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="w-[100px]">Сессия</TableHead>
-                                    <TableHead>Дата</TableHead>
-                                    <TableHead>Время</TableHead>
-                                    <TableHead className="text-right">Точность</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {detailedStats.map((session, index) => (
-                                    <TableRow key={session.timestamp}>
-                                      <TableCell className="font-medium">{detailedStats.length - index}</TableCell>
-                                      <TableCell>{formatSessionDate(session.timestamp)}</TableCell>
-                                      <TableCell>{formatSessionDuration(session.duration)}</TableCell>
-                                      <TableCell className="text-right">
-                                        {calculateSessionAccuracy(session.correctAnswers, session.totalQuestions)}%
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            ) : (
-                              <div className="text-center text-muted-foreground py-8">
-                                Нет данных о сессиях для этой тренировки.
+                        {/* Training Stats */}
+                        {stats ? (
+                          <Card className="p-6">
+                            <h3 className="text-lg font-semibold mb-4">Статистика всех сессий</h3>
+                            <div className={cn(
+                              "gap-4 text-center",
+                              isMobileMode ? "grid grid-cols-2 space-y-2" : "grid grid-cols-4"
+                            )}>
+                              <div>
+                                <div className="text-2xl font-bold text-primary">{stats.accuracy}%</div>
+                                <div className="text-sm text-muted-foreground">Точность</div>
                               </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center text-muted-foreground">
-                  <h2 className="text-xl font-semibold">Тренировка ренжей</h2>
-                  <p>Выберите тренировку из списка слева или создайте новую.</p>
+                              <div>
+                                <div className="text-2xl font-bold text-primary">{stats.hands}</div>
+                                <div className="text-sm text-muted-foreground">Рук сыграно</div>
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-primary">{stats.time}</div>
+                                <div className="text-sm text-muted-foreground">Среднее время</div>
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-primary">{stats.sessions}</div>
+                                <div className="text-sm text-muted-foreground">Сессий</div>
+                              </div>
+                            </div>
+                          </Card>
+                        ) : (
+                          <Card className="p-6 text-center text-muted-foreground">
+                            Начните тренировку, чтобы собрать статистику.
+                          </Card>
+                        )}
+
+                        {/* Start Training Button */}
+                        <div className="text-center">
+                          <Button 
+                            size="lg" 
+                            variant="poker"
+                            onClick={() => handleStartTraining(training.id)}
+                          >
+                            <Play className="h-5 w-5 mr-2" />
+                            Запустить тренировку
+                          </Button>
+                        </div>
+
+                        {/* Detailed Session History (PC only) */}
+                        {!isMobileMode && (
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>История сессий</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {detailedStats.length > 0 ? (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="w-[100px]">Сессия</TableHead>
+                                      <TableHead>Дата</TableHead>
+                                      <TableHead>Время</TableHead>
+                                      <TableHead className="text-right">Точность</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {detailedStats.map((session, index) => (
+                                      <TableRow key={session.timestamp}>
+                                        <TableCell className="font-medium">{detailedStats.length - index}</TableCell>
+                                        <TableCell>{formatSessionDate(session.timestamp)}</TableCell>
+                                        <TableCell>{formatSessionDuration(session.duration)}</TableCell>
+                                        <TableCell className="text-right">
+                                          {calculateSessionAccuracy(session.correctAnswers, session.totalQuestions)}%
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              ) : (
+                                <div className="text-center text-muted-foreground py-8">
+                                  Нет данных о сессиях для этой тренировки.
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
-              </div>
-            )}
+              ) : (
+                !isMobileMode && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center text-muted-foreground">
+                      <h2 className="text-xl font-semibold">Тренировка ренжей</h2>
+                      <p>Выберите тренировку из списка слева или создайте новую.</p>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <CreateTrainingDialog
@@ -358,6 +442,57 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
         onOpenChange={setShowCreateDialog}
         onCreateTraining={handleCreateTraining}
       />
+
+      {isMobileMode && (
+        <Dialog open={!!statsModalTrainingId} onOpenChange={(isOpen) => { if (!isOpen) setStatsModalTrainingId(null); }}>
+          <DialogContent mobileFullscreen className="flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle>{statsModalTraining?.name}</DialogTitle>
+              <DialogDescription>История сессий</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto -mx-6 px-6">
+              {modalStats.length > 0 ? (
+                <div className="space-y-2 py-4">
+                  {modalStats.map((session, index) => (
+                    <Card key={session.timestamp} className="p-3">
+                      <div className="grid grid-cols-3 items-center gap-4 text-sm">
+                        <div className="font-medium">
+                          <p>Сессия {modalStats.length - index}</p>
+                          <p className="text-xs text-muted-foreground">{formatSessionDate(session.timestamp)}</p>
+                        </div>
+                        <div className="text-center text-muted-foreground">
+                          {formatSessionDuration(session.duration)}
+                        </div>
+                        <div className="text-right font-semibold">
+                          {calculateSessionAccuracy(session.correctAnswers, session.totalQuestions)}%
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-center text-muted-foreground">
+                  Нет данных о сессиях для этой тренировки.
+                </div>
+              )}
+            </div>
+            {modalStats.length > 0 && (
+              <div className="flex-shrink-0 border-t mt-auto p-4 bg-card/50">
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Общее время</div>
+                    <div className="text-lg font-bold">{formatLongDuration(summaryStats.totalDuration)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Общая точность</div>
+                    <div className="text-lg font-bold">{summaryStats.totalAccuracy.toFixed(1)}%</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 };
