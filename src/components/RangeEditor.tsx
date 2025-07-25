@@ -34,6 +34,13 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion"; // Import Accordion components
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Range {
   id: string;
@@ -641,6 +648,104 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
     return style;
   };
 
+  const renderActionButtons = () => (
+    <div className={cn(isMobileMode ? "grid grid-cols-2 gap-2" : "space-y-2")}>
+      {actionButtons.map((button) => (
+        <div key={button.id} className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => setActiveAction(button.id)}
+            style={getActionButtonStyle(button)}
+            className={cn(
+              "flex-1 min-w-0 border-transparent",
+              "hover:opacity-90 transition-opacity",
+              activeAction === button.id && "ring-2 ring-offset-2 ring-offset-card ring-primary",
+              button.type === 'simple' && !button.isFontAdaptive && "text-base" // override adaptive text
+            )}
+          >
+            <span className="truncate px-1">{button.name}</span>
+          </Button>
+          <div className="flex items-center gap-1">
+            {button.type === 'simple' ? (
+              isMobileMode ? (
+                <AlertDialog>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => { setButtonToEdit(button); setSettingsDialogOpen(true); }}>
+                        Настроить
+                      </DropdownMenuItem>
+                      {actionButtons.length > 1 && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                              Удалить
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Это действие безвозвратно удалит кнопку "{button.name}" и сбросит все руки, использующие это действие.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deleteActionButton(button.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Удалить
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => { setButtonToEdit(button); setSettingsDialogOpen(true); }}>
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )
+            ) : (
+              <div className="w-6 h-6 flex items-center justify-center">
+                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              </div>
+            )}
+            
+            {actionButtons.length > 1 && (!isMobileMode || button.type !== 'simple') && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Это действие безвозвратно удалит кнопку "{button.name}" и сбросит все руки, использующие это действие.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => deleteActionButton(button.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Удалить
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className={cn(
       "bg-background",
@@ -702,50 +807,7 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    {actionButtons.map((button) => (
-                      <div key={button.id} className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => setActiveAction(button.id)}
-                          style={getActionButtonStyle(button)}
-                          className={cn(
-                            "flex-1 min-w-0 border-transparent",
-                            "hover:opacity-90 transition-opacity",
-                            activeAction === button.id && "ring-2 ring-offset-2 ring-offset-card ring-primary",
-                            button.type === 'simple' && !button.isFontAdaptive && "text-base" // override adaptive text
-                          )}
-                        >
-                          <span className="truncate px-1">{button.name}</span>
-                        </Button>
-                        <div className="flex gap-1">
-                          {button.type === 'simple' ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => { setButtonToEdit(button); setSettingsDialogOpen(true); }}
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <div className="w-6 h-6 flex items-center justify-center">
-                              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                          {actionButtons.length > 1 && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => deleteActionButton(button.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  {renderActionButtons()}
                 </div>
               </div>
             </div>
@@ -791,50 +853,7 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
-              
-              <div className="space-y-2">
-                {actionButtons.map((button) => (
-                  <div key={button.id} className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => setActiveAction(button.id)}
-                      style={getActionButtonStyle(button)}
-                      className={cn(
-                        "flex-1 min-w-0 border-transparent",
-                        "hover:opacity-90 transition-opacity",
-                        activeAction === button.id && "ring-2 ring-offset-2 ring-offset-card ring-primary",
-                        button.type === 'simple' && !button.isFontAdaptive && "text-base" // override adaptive text
-                      )}
-                    >
-                       <span className="truncate px-1">{button.name}</span>
-                    </Button>
-                    <div className="flex gap-1">
-                      {button.type === 'simple' ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => { setButtonToEdit(button); setSettingsDialogOpen(true); }}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <div className="w-6 h-6 flex items-center justify-center">
-                          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      {actionButtons.length > 1 && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => deleteActionButton(button.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {renderActionButtons()}
             </div>
           </div>
 
