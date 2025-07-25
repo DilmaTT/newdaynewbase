@@ -5,9 +5,6 @@ export interface SimpleActionButton {
   id: string;
   name: string;
   color: string;
-  isFontAdaptive?: boolean;
-  fontSize?: number;
-  fontColor?: 'white' | 'black';
 }
 
 export interface WeightedActionButton {
@@ -70,31 +67,11 @@ export const RangeProvider = ({ children }: { children: ReactNode }) => {
   const [actionButtons, setActionButtons] = useState<ActionButton[]>(() => {
     const saved = localStorage.getItem('poker-ranges-actions');
     if (saved) {
+      // Basic migration: if an old button doesn't have a 'type', assume it's 'simple'
       const parsed = JSON.parse(saved);
-      return parsed.map((btn: any) => {
-        if (!btn.type) {
-          // Old format, migrate to new simple button format
-          return { 
-            ...btn, 
-            type: 'simple',
-            isFontAdaptive: true,
-            fontSize: 12,
-            fontColor: 'white'
-          };
-        }
-        return btn;
-      });
+      return parsed.map((btn: any) => btn.type ? btn : { ...btn, type: 'simple' });
     }
-    // Default button with new font settings
-    return [{ 
-      type: 'simple', 
-      id: 'raise', 
-      name: 'Raise', 
-      color: '#8b5cf6',
-      isFontAdaptive: true,
-      fontSize: 12,
-      fontColor: 'white'
-    }];
+    return [{ type: 'simple', id: 'raise', name: 'Raise', color: '#8b5cf6' }];
   });
 
   // Save to localStorage when data changes

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import React, { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ActionButton, SimpleActionButton } from "@/contexts/RangeContext";
+import { ActionButton } from "@/contexts/RangeContext";
 
 // Poker hand matrix data
 const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
@@ -138,25 +138,23 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
     const action = actionButtons.find(b => b.id === actionId);
     if (!action) return {};
 
-    const style: React.CSSProperties = {};
-
     if (action.type === 'simple') {
-      style.backgroundColor = action.color;
-      style.color = action.fontColor ?? 'white';
-      if (action.isFontAdaptive === false && action.fontSize) {
-        style.fontSize = `${action.fontSize}px`;
-      }
-    } else if (action.type === 'weighted') {
+      return { backgroundColor: action.color, color: 'white' };
+    }
+
+    if (action.type === 'weighted') {
       const color1 = getActionColor(action.action1Id, actionButtons);
       const color2 = getActionColor(action.action2Id, actionButtons);
       const weight1 = action.weight;
       
-      style.background = `linear-gradient(to right, ${color1} ${weight1}%, ${color2} ${weight1}%)`;
-      style.color = 'white'; // Default for weighted, can be customized later
-      style.border = 'none';
+      return {
+        background: `linear-gradient(to right, ${color1} ${weight1}%, ${color2} ${weight1}%)`,
+        color: 'white',
+        border: 'none' // Remove border for gradient buttons for a cleaner look
+      };
     }
 
-    return style;
+    return {};
   };
 
   const getHandColorClass = (hand: string) => {
@@ -182,19 +180,12 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
     isBackgroundMode ? "max-w-full max-h-full" : "" // Ensure it fits within parent
   );
   
-  const getButtonClasses = (hand: string) => {
-    const actionId = selectedHands[hand];
-    const action = actionButtons.find(b => b.id === actionId) as SimpleActionButton | undefined;
-
-    const isAdaptive = !action || action.isFontAdaptive !== false;
-
-    return cn(
-      "w-full h-full aspect-square font-mono border transition-all duration-200",
-      "hover:ring-2 hover:ring-ring",
-      "rounded-sm md:rounded-md",
-      isAdaptive && (isMobile ? "text-[clamp(0.625rem,1.5vw,0.875rem)] p-0" : "text-[clamp(0.75rem,1.8vw,1.05rem)] p-1")
-    );
-  };
+  const buttonClasses = cn(
+    "w-full h-full aspect-square font-mono border transition-all duration-200",
+    "hover:ring-2 hover:ring-ring",
+    "rounded-sm md:rounded-md",
+    isMobile ? "text-[clamp(0.625rem,1.5vw,0.875rem)] p-0" : "text-[clamp(0.75rem,1.8vw,1.05rem)] p-1"
+  );
 
   const matrixContent = (
     <div
@@ -209,7 +200,7 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
             variant="outline"
             size="sm"
             className={cn(
-              getButtonClasses(hand),
+              buttonClasses,
               getHandColorClass(hand)
             )}
             style={getHandStyle(hand)}

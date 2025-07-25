@@ -11,8 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -20,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useRangeContext } from "@/contexts/RangeContext";
 import { StoredChart, ChartButton } from "./Chart"; // Import interfaces
 
@@ -69,7 +69,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       height: 40, // Default height
       type: allRanges.length > 0 ? 'normal' : 'label', // Default type
       isFontAdaptive: true,
-      fontSize: 12,
+      fontSize: 16,
       fontColor: 'white',
     };
     setButtons((prev) => [...prev, newButton]);
@@ -195,7 +195,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       let newX = currentButton.x;
       let newY = currentButton.y;
 
-      const minSize = 50; // Minimum button size
+      const minSize = 5; // Minimum button size
 
       switch (resizeDirection) {
         case 'e':
@@ -285,7 +285,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       let newX = currentButton.x;
       let newY = currentButton.y;
 
-      const minSize = 50; // Minimum button size
+      const minSize = 5; // Minimum button size
 
       switch (resizeDirection) {
         case 'e':
@@ -451,25 +451,6 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     setCanvasHeight(Math.floor(newHeight > 100 ? newHeight : 100));
   };
 
-  const getButtonStyle = (button: ChartButton) => {
-    const style: React.CSSProperties = {
-      backgroundColor: button.color,
-      position: 'absolute',
-      left: button.x,
-      top: button.y,
-      width: button.width,
-      height: button.height,
-      zIndex: activeButtonId === button.id ? 100 : 1,
-      color: button.fontColor ?? 'white',
-    };
-
-    if (button.isFontAdaptive === false && button.fontSize) {
-      style.fontSize = `${button.fontSize}px`;
-    }
-
-    return style;
-  };
-
   const Controls = (
     <div className={cn(
       "flex items-center gap-4",
@@ -524,28 +505,45 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       {buttons.length === 0 && (
         <p className="text-muted-foreground">Рабочая область (холст)</p>
       )}
-      {buttons.map((button) => (
-        <div
-          key={button.id}
-          style={getButtonStyle(button)}
-          className="relative flex items-center justify-center rounded-md shadow-md font-semibold group" // Removed text-white
-          onMouseDown={(e) => handleMouseDown(e, button)}
-          onTouchStart={(e) => handleTouchStart(e, button)}
-          onMouseMove={(e) => handleButtonMouseMove(e, button)}
-          onMouseLeave={handleButtonMouseLeave}
-        >
-          {button.name}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity settings-icon" // Added settings-icon class
-            onClick={(e) => handleSettingsClick(e, button)}
-            title="Настройки кнопки"
+      {buttons.map((button) => {
+        const finalStyle: React.CSSProperties = {
+            backgroundColor: button.color,
+            position: 'absolute',
+            left: button.x,
+            top: button.y,
+            width: button.width,
+            height: button.height,
+            zIndex: activeButtonId === button.id ? 100 : 1,
+            color: (button.isFontAdaptive === false && button.fontColor) ? button.fontColor : 'white',
+        };
+
+        if (button.isFontAdaptive === false && button.fontSize) {
+            finalStyle.fontSize = `${button.fontSize}px`;
+        }
+
+        return (
+          <div
+            key={button.id}
+            style={finalStyle}
+            className="relative flex items-center justify-center rounded-md shadow-md font-semibold group"
+            onMouseDown={(e) => handleMouseDown(e, button)}
+            onTouchStart={(e) => handleTouchStart(e, button)}
+            onMouseMove={(e) => handleButtonMouseMove(e, button)}
+            onMouseLeave={handleButtonMouseLeave}
           >
-            <Settings className="h-4 w-4 text-white" />
-          </Button>
-        </div>
-      ))}
+            {button.name}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity settings-icon"
+              onClick={(e) => handleSettingsClick(e, button)}
+              title="Настройки кнопки"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+        )
+      })}
     </div>
   );
 
@@ -648,50 +646,56 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
               </div>
               
               {/* Font Settings */}
-              <div className="space-y-3 pt-4 mt-4 border-t">
-                <Label className="font-semibold text-left col-span-4">Настройки шрифта</Label>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="adaptiveFont" className="text-right">Адаптивный</Label>
-                    <div className="col-span-3 flex items-center">
-                        <Checkbox
-                            id="adaptiveFont"
-                            checked={editingButton?.isFontAdaptive ?? true}
-                            onCheckedChange={(checked) => setEditingButton(prev => prev ? { ...prev, isFontAdaptive: Boolean(checked) } : null)}
-                        />
-                    </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="fontSize" className="text-right">Размер (px)</Label>
-                    <Input
-                        id="fontSize"
-                        type="number"
-                        value={editingButton?.fontSize || 12}
-                        onChange={(e) => setEditingButton(prev => prev ? { ...prev, fontSize: Number(e.target.value) } : null)}
-                        className="col-span-3"
-                        disabled={editingButton?.isFontAdaptive ?? true}
+              <div className="grid grid-cols-4 items-center gap-4 border-t pt-4 mt-2">
+                <Label className="text-right">Шрифт</Label>
+                <div className="col-span-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="adaptiveFont"
+                      checked={editingButton?.isFontAdaptive ?? true}
+                      onCheckedChange={(checked) => {
+                        setEditingButton(prev => prev ? { ...prev, isFontAdaptive: !!checked } : null);
+                      }}
                     />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Цвет</Label>
-                    <RadioGroup
-                        value={editingButton?.fontColor || 'white'}
-                        onValueChange={(value) => setEditingButton(prev => prev ? { ...prev, fontColor: value as 'white' | 'black' } : null)}
-                        className="col-span-3 flex space-x-4"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="white" id="r-white-chart" />
-                            <Label htmlFor="r-white-chart" className="cursor-pointer">Белый</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="black" id="r-black-chart" />
-                            <Label htmlFor="r-black-chart" className="cursor-pointer">Черный</Label>
-                        </div>
-                    </RadioGroup>
+                    <Label htmlFor="adaptiveFont" className="font-normal">Адаптивный</Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="fontSize"
+                      type="number"
+                      value={editingButton?.fontSize || 16}
+                      onChange={(e) => setEditingButton(prev => prev ? { ...prev, fontSize: parseInt(e.target.value) || 16 } : null)}
+                      className="w-16 h-8"
+                      min="1"
+                      disabled={editingButton?.isFontAdaptive ?? true}
+                    />
+                    <Label htmlFor="fontSize" className="font-normal text-sm text-muted-foreground">px</Label>
+                  </div>
+
+                  <RadioGroup
+                    value={editingButton?.fontColor || 'white'}
+                    onValueChange={(value: 'white' | 'black') => {
+                      setEditingButton(prev => prev ? { ...prev, fontColor: value } : null);
+                    }}
+                    className="flex gap-4"
+                    disabled={editingButton?.isFontAdaptive ?? true}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="white" id="fontWhite" />
+                      <Label htmlFor="fontWhite" className="font-normal">Белый</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="black" id="fontBlack" />
+                      <Label htmlFor="fontBlack" className="font-normal">Черный</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
               </div>
 
-              {/* Width and Height */}
-              <div className="grid grid-cols-4 items-center gap-4 pt-4 mt-4 border-t">
+
+              {/* Width and Height Settings */}
+              <div className="grid grid-cols-4 items-center gap-4 border-t pt-4 mt-2">
                 <Label htmlFor="buttonWidth" className="text-right">
                   Ширина
                 </Label>
